@@ -15,11 +15,47 @@ const METHODS = {
 /** algosdk v3 returns Address objects; ATC sender must be a plain string. */
 const str = (addr) => (addr ? addr.toString() : addr);
 
+/** Helper to encode Box Key: "rev_" + uint64(assetId) */
+function getBoxKey(assetId) {
+    const prefix = new Uint8Array([114, 101, 118, 95]); // "rev_"
+    const id = BigInt(assetId);
+    const idBytes = algosdk.encodeUint64(id);
+    const boxName = new Uint8Array(prefix.length + idBytes.length);
+    boxName.set(prefix);
+    boxName.set(idBytes, prefix.length);
+    return boxName;
+}
+
 export async function issueCredential(sender, signer, { studentAddress, assetName, unitName, ipfsUrl }) {
     const sp = await algodClient.getTransactionParams().do();
     sp.flatFee = true;
     sp.fee = 2000n; // outer + inner asset-create
 
+    // 1. Simulate to find the resulting Asset ID (needed for Box Key)
+    const simAtc = new algosdk.AtomicTransactionComposer();
+    simAtc.addMethodCall({
+        appID: APP_ID,
+        method: METHODS.issue,
+        methodArgs: [studentAddress, assetName, unitName, ipfsUrl],
+        sender: str(sender),
+        signer,
+        suggestedParams: sp,
+    });
+
+    // Simulate with allowUnnamedResources to let it access the box without ref
+    const simResult = await simAtc.simulate(algodClient, new algosdk.modelsv2.SimulateRequest({
+        txnGroups: [], allowUnnamedResources: true, allowEmptySignatures: true
+    }));
+
+    if (simResult.failureMessage) {
+        throw new Error("Simulation failed: " + simResult.failureMessage);
+    }
+
+    // Parse Asset ID from return value
+    const newAssetId = simResult.methodResults[0].returnValue;
+    const boxName = getBoxKey(newAssetId);
+
+    // 2. Build Real Transaction with Box Reference
     const atc = new algosdk.AtomicTransactionComposer();
     atc.addMethodCall({
         appID: APP_ID,
@@ -28,6 +64,7 @@ export async function issueCredential(sender, signer, { studentAddress, assetNam
         sender: str(sender),
         signer,
         suggestedParams: sp,
+        boxes: [{ appIndex: 0, name: boxName }]
     });
 
     const result = await atc.execute(algodClient, 4);
@@ -42,6 +79,12 @@ export async function transferToStudent(sender, signer, { assetId, studentAddres
     sp.flatFee = true;
     sp.fee = 2000n; // outer + inner asset-transfer
 
+    console.log(`Transferring Asset ${assetId} to ${studentAddress}`);
+
+    // Debug: Ensure assetId is a number for foreignAssets
+    const foreignAssets = [Number(assetId)];
+    console.log("Foreign Assets:", foreignAssets);
+
     const atc = new algosdk.AtomicTransactionComposer();
     atc.addMethodCall({
         appID: APP_ID,
@@ -50,6 +93,9 @@ export async function transferToStudent(sender, signer, { assetId, studentAddres
         sender: str(sender),
         signer,
         suggestedParams: sp,
+        boxes: [{ appIndex: 0, name: getBoxKey(assetId) }],
+        foreignAssets: foreignAssets,
+        appForeignAssets: foreignAssets, // Try alternate name for SDK compatibility
     });
 
     const result = await atc.execute(algodClient, 4);
@@ -61,6 +107,9 @@ export async function revokeCredential(sender, signer, { assetId, studentAddress
     sp.flatFee = true;
     sp.fee = 3000n; // outer + freeze + clawback-transfer
 
+    console.log(`Revoking Asset ${assetId} from ${studentAddress}`);
+    const foreignAssets = [Number(assetId)];
+
     const atc = new algosdk.AtomicTransactionComposer();
     atc.addMethodCall({
         appID: APP_ID,
@@ -69,6 +118,9 @@ export async function revokeCredential(sender, signer, { assetId, studentAddress
         sender: str(sender),
         signer,
         suggestedParams: sp,
+        boxes: [{ appIndex: 0, name: getBoxKey(assetId) }],
+        foreignAssets: foreignAssets,
+        appForeignAssets: foreignAssets,
     });
 
     const result = await atc.execute(algodClient, 4);

@@ -13,6 +13,7 @@ export default function StudentPage() {
     const [assets, setAssets] = useState([]);
     const [loading, setLoading] = useState(false);
     const [optInAssetId, setOptInAssetId] = useState('');
+    const [optInFee, setOptInFee] = useState('');
     const [optInLoading, setOptInLoading] = useState(false);
 
     // Auto-fill with connected wallet
@@ -28,23 +29,32 @@ export default function StudentPage() {
         setAssets([]);
         try {
             const rawAssets = await getAccountAssets(addressInput.trim());
+            console.log("Raw Assets:", rawAssets);
+
             // For each ASA, fetch detailed info
             const detailed = await Promise.all(
-                rawAssets.map(async (holding) => {
-                    const id = holding['asset-id'];
+                rawAssets.map(async (holding, index) => {
+                    // Support both SDK v3 objects (camelCase) and raw Indexer JSON (kebab-case)
+                    const id = holding.assetId || holding['asset-id'];
+                    const amount = holding.amount;
+                    const isFrozen = holding.isFrozen !== undefined ? holding.isFrozen : holding['is-frozen'];
+
+                    if (!id) return null; // Skip invalid assets
+
                     const info = await getAssetInfo(id);
                     return {
-                        id,
-                        amount: holding.amount,
-                        frozen: holding['is-frozen'],
+                        id: id.toString(), // Ensure ID is string for display/key
+                        amount: amount.toString(), // Ensure BigInt is string
+                        frozen: isFrozen,
                         name: info?.params?.name || `ASA #${id}`,
                         unitName: info?.params?.['unit-name'] || '',
                         url: info?.params?.url || '',
                         total: info?.params?.total,
+                        uniqueKey: `${id}-${index}`
                     };
                 })
             );
-            setAssets(detailed);
+            setAssets(detailed.filter(a => a !== null));
             if (detailed.length === 0) {
                 toast('No ASA holdings found for this address.', { icon: 'ℹ️' });
             }
@@ -62,9 +72,10 @@ export default function StudentPage() {
         if (!optInAssetId) return toast.error('Enter an Asset ID to opt in.');
         setOptInLoading(true);
         try {
-            const { txId } = await optInToAsset(activeAccount, signer, optInAssetId);
+            const { txId } = await optInToAsset(activeAccount, signer, optInAssetId, optInFee);
             toast.success(`Opted in to ASA ${optInAssetId}!`);
             setOptInAssetId('');
+            setOptInFee('');
         } catch (err) {
             toast.error(err?.message || 'Opt-in failed.');
             console.error(err);
@@ -125,7 +136,7 @@ export default function StudentPage() {
                     ) : (
                         <div style={{ display: 'grid', gap: 16 }}>
                             {assets.map((asset) => (
-                                <CredentialCard key={asset.id} asset={asset} />
+                                <CredentialCard key={asset.uniqueKey} asset={asset} />
                             ))}
                         </div>
                     )}
@@ -157,6 +168,16 @@ export default function StudentPage() {
                         disabled={!isConnected || optInLoading}
                         style={{ flex: 1, minWidth: 200 }}
                         id="opt-in-asset-id"
+                    />
+                    <input
+                        className="form-input"
+                        type="number"
+                        placeholder="Fee (µAlgo)"
+                        value={optInFee}
+                        onChange={(e) => setOptInFee(e.target.value)}
+                        disabled={!isConnected || optInLoading}
+                        style={{ width: 120 }}
+                        title="Transaction Fee"
                     />
                     <button
                         type="submit"

@@ -52,7 +52,7 @@ export default function InstitutePage() {
 
 /* ─── Issue Credential Form ─── */
 function IssueForm({ isConnected, sender, signer }) {
-    const [form, setForm] = useState({ studentAddress: '', assetName: '', unitName: '', ipfsUrl: '' });
+    const [form, setForm] = useState({ studentAddress: '', assetName: '', unitName: '', ipfsUrl: '', customFee: '' });
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
 
@@ -138,6 +138,20 @@ function IssueForm({ isConnected, sender, signer }) {
                     />
                     <span className="form-hint">Link to off-chain certificate document</span>
                 </div>
+                <div className="form-group">
+                    <label className="form-label" htmlFor="issue-fee">Transaction Fee (µAlgo)</label>
+                    <input
+                        id="issue-fee"
+                        className="form-input"
+                        name="customFee"
+                        type="number"
+                        placeholder="Default (2000)"
+                        value={form.customFee}
+                        onChange={handleChange}
+                        disabled={!isConnected || loading}
+                    />
+                    <span className="form-hint">Optional: Override default fee (min 2000 for this op)</span>
+                </div>
                 <button
                     type="submit"
                     className="btn btn-primary btn-full"
@@ -177,7 +191,7 @@ function IssueForm({ isConnected, sender, signer }) {
 
 /* ─── Transfer Form ─── */
 function TransferForm({ isConnected, sender, signer }) {
-    const [form, setForm] = useState({ assetId: '', studentAddress: '' });
+    const [form, setForm] = useState({ assetId: '', studentAddress: '', customFee: '' });
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
 
@@ -242,6 +256,19 @@ function TransferForm({ isConnected, sender, signer }) {
                         disabled={!isConnected || loading}
                     />
                 </div>
+                <div className="form-group">
+                    <label className="form-label" htmlFor="transfer-fee">Transaction Fee (µAlgo)</label>
+                    <input
+                        id="transfer-fee"
+                        className="form-input"
+                        name="customFee"
+                        type="number"
+                        placeholder="Default (2000)"
+                        value={form.customFee}
+                        onChange={handleChange}
+                        disabled={!isConnected || loading}
+                    />
+                </div>
                 <button
                     type="submit"
                     className="btn btn-primary btn-full"
@@ -269,7 +296,7 @@ function TransferForm({ isConnected, sender, signer }) {
 
 /* ─── Revoke Form ─── */
 function RevokeForm({ isConnected, sender, signer }) {
-    const [form, setForm] = useState({ assetId: '', studentAddress: '' });
+    const [form, setForm] = useState({ assetId: '', studentAddress: '', customFee: '' });
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
     const [confirmed, setConfirmed] = useState(false);
@@ -326,6 +353,19 @@ function RevokeForm({ isConnected, sender, signer }) {
                         name="studentAddress"
                         placeholder="ABCDEF1234…"
                         value={form.studentAddress}
+                        onChange={handleChange}
+                        disabled={!isConnected || loading}
+                    />
+                </div>
+                <div className="form-group">
+                    <label className="form-label" htmlFor="revoke-fee">Transaction Fee (µAlgo)</label>
+                    <input
+                        id="revoke-fee"
+                        className="form-input"
+                        name="customFee"
+                        type="number"
+                        placeholder="Default (3000)"
+                        value={form.customFee}
                         onChange={handleChange}
                         disabled={!isConnected || loading}
                     />

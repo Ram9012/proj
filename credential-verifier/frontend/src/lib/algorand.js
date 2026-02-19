@@ -44,6 +44,7 @@ export async function getAccountAssets(address) {
 }
 
 export async function getAssetInfo(assetId) {
+    if (!assetId) return null;
     try {
         const response = await indexerClient.lookupAssetByID(assetId).do();
         return response.asset;
