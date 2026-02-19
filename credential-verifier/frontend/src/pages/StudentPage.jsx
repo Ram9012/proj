@@ -1,4 +1,6 @@
 import React, { useState, useCallback } from 'react';
+import algosdk from 'algosdk';
+import QRCode from 'react-qr-code';
 import { useWalletContext } from '../context/WalletContext';
 import { optInToAsset } from '../lib/contract';
 import { getAccountAssets, getAssetInfo, getExplorerUrl } from '../lib/algorand';
@@ -15,6 +17,9 @@ export default function StudentPage() {
     const [optInAssetId, setOptInAssetId] = useState('');
     const [optInFee, setOptInFee] = useState('');
     const [optInLoading, setOptInLoading] = useState(false);
+
+    // QR Code State
+    const [showQR, setShowQR] = useState(false);
 
     // Auto-fill with connected wallet
     function handleUseMine() {
@@ -88,7 +93,64 @@ export default function StudentPage() {
         <div className="fade-in">
             <div className="section-header">
                 <h2>Student Credential Wallet</h2>
-                <p>View blockchain credentials and opt in to receive new ones.</p>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', marginTop: '10px' }}>
+                    <p style={{ margin: 0 }}>View blockchain credentials and opt in to receive new ones.</p>
+
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                            className="btn btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            onClick={() => {
+                                const addr = addressInput.trim();
+                                if (algosdk.isValidAddress(addr)) {
+                                    navigator.clipboard.writeText(addr);
+                                    toast.success("Address copied! 📋");
+                                } else {
+                                    toast.error("Please enter a valid Algorand address to share.");
+                                }
+                            }}
+                        >
+                            📋 Copy Address
+                        </button>
+                        <button
+                            className="btn btn-primary"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            onClick={() => {
+                                const addr = addressInput.trim();
+                                if (algosdk.isValidAddress(addr)) {
+                                    setShowQR(!showQR);
+                                } else {
+                                    toast.error("Please enter a valid Algorand address to generate QR.");
+                                }
+                            }}
+                        >
+                            📱 {showQR ? 'Hide QR' : 'Show QR'}
+                        </button>
+                    </div>
+                </div>
+
+                {/* QR Code Modal / Inline */}
+                {showQR && algosdk.isValidAddress(addressInput.trim()) && (
+                    <div className="fade-in" style={{
+                        marginTop: '20px',
+                        padding: '24px',
+                        background: 'white',
+                        borderRadius: '16px',
+                        display: 'inline-flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '12px'
+                    }}>
+                        <QRCode
+                            value={`${window.location.origin}/verify?address=${addressInput.trim()}`}
+                            size={200}
+                            bgColor="#ffffff"
+                            fgColor="#000000"
+                        />
+                        <span style={{ color: '#333', fontSize: '0.9rem', fontWeight: 600 }}>Scan to Verify: {addressInput.slice(0, 4)}...</span>
+                    </div>
+                )}
             </div>
 
             {/* ── Lookup section ── */}

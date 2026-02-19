@@ -1,175 +1,200 @@
-import React, { useState } from 'react';
-import { getIssuerInfo } from '../lib/contract';
-import { getExplorerUrl, APP_ID } from '../lib/algorand';
+
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import algosdk from 'algosdk';
+import { indexerClient, APP_ID, getExplorerUrl } from '../lib/algorand';
 import toast from 'react-hot-toast';
 
-const FAQ_ITEMS = [
-    {
-        step: '1',
-        title: 'Get the App ID',
-        desc: 'Ask the institution for their CredVerify contract App ID. This is public on Algorand TestNet/MainNet.',
-    },
-    {
-        step: '2',
-        title: 'Click "Get Issuer Info"',
-        desc: "Queries the contract's global state for the admin address. No wallet required.",
-    },
-    {
-        step: '3',
-        title: 'Verify the institution address',
-        desc: "Cross-reference the returned address with the institution's publicly listed Algorand address.",
-    },
-    {
-        step: '4',
-        title: 'Check the credential ASA',
-        desc: "Use the student's Asset ID on AlgoExplorer to verify manager/freeze/clawback all reference the contract, proving authenticity.",
-    },
-];
-
 export default function RecruiterPage() {
-    const [issuerAddress, setIssuerAddress] = useState(null);
+    const [searchParams] = useSearchParams();
+    const [address, setAddress] = useState(searchParams.get('address') || '');
     const [loading, setLoading] = useState(false);
+    const [credentials, setCredentials] = useState([]);
+    const [searched, setSearched] = useState(false);
 
-    async function handleGetIssuer() {
-        if (APP_ID === 0) {
-            return toast.error('VITE_APP_ID is not configured. Set it in your .env file.');
+    useEffect(() => {
+        const addrParam = searchParams.get('address');
+        if (addrParam) {
+            setAddress(addrParam);
+            handleVerify(addrParam);
         }
+    }, [searchParams]);
+
+    async function handleVerify(targetAddress) {
+        if (!targetAddress) return;
+
+        // Basic address validation
+        if (!algosdk.isValidAddress(targetAddress)) {
+            toast.error("Invalid Algorand address");
+            return;
+        }
+
         setLoading(true);
-        setIssuerAddress(null);
+        setSearched(true);
+        setCredentials([]);
+
         try {
-            const addr = await getIssuerInfo();
-            setIssuerAddress(addr);
-            toast.success('Issuer info retrieved!');
-        } catch (err) {
-            toast.error(err?.message || 'Failed to fetch issuer info.');
-            console.error(err);
+            // 1. Get App Address (Issuer)
+            // 1. Get App Address (Issuer)
+            const appAddressObj = algosdk.getApplicationAddress(parseInt(APP_ID));
+            const appAddress = appAddressObj.toString();
+            console.log("App Address (Issuer):", appAddress);
+
+            // 2. Fetch all assets held by the student
+            const accountInfo = await indexerClient.lookupAccountAssets(targetAddress).do();
+            const assets = accountInfo.assets || [];
+
+            // 3. Filter for valid credentials
+            // - Student must hold specific amount > 0 (usually 1 for NFT)
+            // - Asset Creator must be the App Address
+            const validCreds = [];
+
+            for (const assetHolder of assets) {
+                if (assetHolder.amount > 0) {
+                    // Support both SDK v3 objects (camelCase) and raw Indexer JSON (kebab-case)
+                    const assetId = assetHolder['asset-id'] || assetHolder.assetId;
+                    if (!assetId) continue;
+
+                    // Fetch asset details to check creator
+                    const assetInfo = await indexerClient.lookupAssetByID(assetId).do();
+                    const assetParams = assetInfo.asset.params;
+
+                    if (assetParams.creator === appAddress) {
+                        validCreds.push({
+                            id: assetHolder['asset-id'],
+                            name: assetParams.name,
+                            unitName: assetParams['unit-name'],
+                            url: assetParams.url,
+                            total: assetParams.total
+                        });
+                    }
+                }
+            }
+
+            setCredentials(validCreds);
+            if (validCreds.length === 0) {
+                toast("No credentials found for this student.", { icon: 'ℹ️' });
+            } else {
+                toast.success(`Found ${validCreds.length} valid credentials!`);
+            }
+
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to verify credentials. See console.");
         } finally {
             setLoading(false);
         }
     }
 
+    const onSubmit = (e) => {
+        e.preventDefault();
+        handleVerify(address);
+    };
+
     return (
         <div className="fade-in">
             <div className="section-header">
-                <h2>Recruiter Verification Portal</h2>
-                <p>
-                    Independently verify academic credentials on the Algorand blockchain.
-                    No wallet required — all data is read directly from the contract.
-                </p>
+                <h2>🎓 Recruiter Verification</h2>
+                <p>Verify credentials issued by the university smart contract.</p>
             </div>
 
-            {/* ── Get Issuer Info ── */}
-            <div className="glass-card" style={{ padding: '36px', marginBottom: 24 }}>
-                <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, minWidth: 280 }}>
-                        <h3 style={{ marginBottom: 12 }}>🏛️ Verify Credential Issuer</h3>
-                        <p style={{ fontSize: '0.9rem', marginBottom: 24, lineHeight: 1.7 }}>
-                            Query the smart contract to retrieve the issuing institution's on-chain address.
-                            This address is set at deployment and cannot be changed — making it a cryptographically
-                            verifiable proof of the institution's identity.
-                        </p>
-                        <button
-                            className="btn btn-primary"
-                            onClick={handleGetIssuer}
-                            disabled={loading}
-                            id="btn-get-issuer-info"
-                        >
-                            {loading ? <><span className="spinner" /> Querying&hellip;</> : '🔍 Get Issuer Info'}
-                        </button>
-                    </div>
+            {/* Search Box */}
+            <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto 32px' }}>
+                <form onSubmit={onSubmit} style={{ display: 'flex', gap: '10px' }}>
+                    <input
+                        className="form-input"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="Enter Student Algorand Address..."
+                        style={{ flex: 1, fontFamily: 'monospace' }}
+                    />
+                    <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={loading || !address}
+                    >
+                        {loading ? 'Verifying...' : 'Verify'}
+                    </button>
+                </form>
+            </div>
 
-                    <div style={{
-                        flex: 1,
-                        minWidth: 280,
-                        background: 'rgba(52, 211, 153, 0.06)',
-                        border: '1px solid rgba(52, 211, 153, 0.15)',
-                        borderRadius: 'var(--radius-md)',
-                        padding: '24px',
-                    }}>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-green)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-                            🔒 How it works
-                        </div>
-                        <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {[
-                                'No wallet or authentication required',
-                                'Reads the admin address from global state',
-                                'Simulate-only — no transaction fees',
-                                '100% verifiable on-chain',
-                            ].map((item) => (
-                                <li key={item} style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', paddingLeft: 18, position: 'relative' }}>
-                                    <span style={{ position: 'absolute', left: 0, color: 'var(--accent-green)' }}>✓</span>
-                                    {item}
-                                </li>
+            {/* Results */}
+            {searched && (
+                <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+                    {loading ? (
+                        <div className="spinner" style={{ margin: '40px auto' }} />
+                    ) : credentials.length > 0 ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px' }}>
+                            {credentials.map(cred => (
+                                <div key={cred.id} className="glass-card" style={{ position: 'relative', overflow: 'hidden' }}>
+                                    {/* Verified Badge */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: 12,
+                                        right: 12,
+                                        background: '#10b981',
+                                        color: 'white',
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '0.8rem',
+                                        fontWeight: 'bold',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}>
+                                        <span>✓</span> VERIFIED
+                                    </div>
+
+                                    <h3 style={{ marginTop: 0, paddingRight: '90px' }}>{cred.name}</h3>
+                                    <div style={{ color: '#94a3b8', marginBottom: '16px', fontSize: '0.9rem' }}>
+                                        {cred.unitName}
+                                    </div>
+
+                                    <div style={{
+                                        padding: '12px',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        borderRadius: '8px',
+                                        fontSize: '0.9rem',
+                                        fontFamily: 'monospace'
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                            <span style={{ color: '#94a3b8' }}>Asset ID:</span>
+                                            <a
+                                                href={getExplorerUrl('asset', cred.id)}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                style={{ color: '#38bdf8', textDecoration: 'none' }}
+                                            >
+                                                {cred.id} ↗
+                                            </a>
+                                        </div>
+                                        {cred.url && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <span style={{ color: '#94a3b8' }}>Document:</span>
+                                                <a
+                                                    href={cred.url.replace('ipfs://', 'https://ipfs.io/ipfs/')}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    style={{ color: '#38bdf8', textDecoration: 'none' }}
+                                                >
+                                                    View IPFS ↗
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             ))}
-                        </ul>
-                    </div>
-                </div>
-
-                {issuerAddress && (
-                    <div className="result-box" style={{ marginTop: 28 }}>
-                        <h4>✅ Issuing Institution Verified</h4>
-                        <div className="info-grid" style={{ marginTop: 16 }}>
-                            <div className="info-row">
-                                <span className="info-label">Admin Address</span>
-                                <span className="info-value" id="issuer-address-display">{issuerAddress}</span>
-                            </div>
-                            <div className="info-row">
-                                <span className="info-label">App ID</span>
-                                <a
-                                    className="info-value"
-                                    href={getExplorerUrl('application', APP_ID)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                >
-                                    {APP_ID} ↗
-                                </a>
-                            </div>
-                            <div className="info-row">
-                                <span className="info-label">Explorer</span>
-                                <a
-                                    className="info-value"
-                                    href={getExplorerUrl('address', issuerAddress)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    style={{ fontSize: '0.85rem' }}
-                                >
-                                    View on AlgoExplorer ↗
-                                </a>
-                            </div>
                         </div>
-                    </div>
-                )}
-            </div>
-
-            {/* ── FAQ section ── */}
-            <div className="glass-card" style={{ padding: '32px' }}>
-                <h3 style={{ marginBottom: 20 }}>❓ How to Verify a Credential</h3>
-                <div style={{ display: 'grid', gap: 16 }}>
-                    {FAQ_ITEMS.map(({ step, title, desc }) => (
-                        <div key={step} style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                            <div style={{
-                                flexShrink: 0,
-                                width: 36,
-                                height: 36,
-                                borderRadius: '50%',
-                                background: 'var(--gradient-main)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 800,
-                                fontSize: '0.85rem',
-                                color: '#fff',
-                            }}>
-                                {step}
-                            </div>
-                            <div>
-                                <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-primary)' }}>{title}</div>
-                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{desc}</div>
-                            </div>
+                    ) : (
+                        <div className="glass-card" style={{ textAlign: 'center', padding: '40px' }}>
+                            <h3>No Verified Credentials Found</h3>
+                            <p style={{ color: '#94a3b8' }}>
+                                This address does not hold any credentials issued by the University Smart Contract.
+                            </p>
                         </div>
-                    ))}
+                    )}
                 </div>
-            </div>
+            )}
         </div>
     );
 }

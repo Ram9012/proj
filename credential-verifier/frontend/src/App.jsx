@@ -39,6 +39,7 @@ export default function App() {
             <Route path="/institute" element={<InstitutePage />} />
             <Route path="/student" element={<StudentPage />} />
             <Route path="/recruiter" element={<RecruiterPage />} />
+            <Route path="/verify" element={<RecruiterPage />} />
             <Route path="/app-lab" element={<AppLabPage />} />
             <Route path="/funding" element={<FundingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
