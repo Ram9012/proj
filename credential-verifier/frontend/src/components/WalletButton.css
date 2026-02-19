@@ -1,0 +1,28 @@
+/* styles for wallet indicator in NavBar */
+.wallet-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.wallet-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 8px var(--accent-green);
+    animation: pulse-dot 2s infinite;
+    flex-shrink: 0;
+}
+
+.wallet-addr {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 500px) {
+    .wallet-addr {
+        display: none;
+    }
+}
