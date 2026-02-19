@@ -95,20 +95,37 @@ export default function TransactionWizardPage() {
                 sp.fee = BigInt(fee);
             }
 
-            // Ensure receiver is a string
-            const receiverStr = receiver.toString();
-            console.log("Transaction Details:", { sender, receiver: receiverStr, amount });
+            // Ensure receiver is a string and valid
+            const receiverStr = receiver.toString().trim();
+            const senderStr = sender.toString().trim();
 
-            if (!sender) throw new Error("Sender address is missing");
-            if (!receiverStr) throw new Error("Receiver address is missing");
-
-            const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-                from: sender,
-                to: receiverStr,
-                amount: BigInt(Math.floor(Number(amount) * 1e6)), // Convert ALGO to microAlgo
-                note: note ? new TextEncoder().encode(note) : undefined,
-                suggestedParams: sp
+            console.log("Transaction Details (Pre-Check):", {
+                sender: senderStr,
+                receiver: receiverStr,
+                amount,
+                senderValid: algosdk.isValidAddress(senderStr),
+                receiverValid: algosdk.isValidAddress(receiverStr)
             });
+            console.log("Suggested Params:", sp);
+
+            if (!senderStr) throw new Error("Sender address is missing");
+            if (!receiverStr) throw new Error("Receiver address is missing");
+            if (!algosdk.isValidAddress(senderStr)) throw new Error(`Invalid Sender Address: "${senderStr}"`);
+            if (!algosdk.isValidAddress(receiverStr)) throw new Error(`Invalid Receiver Address: "${receiverStr}"`);
+
+            if (!algosdk.isValidAddress(senderStr)) throw new Error(`Invalid Sender Address: "${senderStr}"`);
+            if (!algosdk.isValidAddress(receiverStr)) throw new Error(`Invalid Receiver Address: "${receiverStr}"`);
+
+            // Use positional arguments (v2 style but supported in v3) for maximum stability
+            // makePaymentTxnWithSuggestedParams(from, to, amount, closeRemainderTo, note, suggestedParams, rekeyTo)
+            const txn = algosdk.makePaymentTxnWithSuggestedParams(
+                senderStr,
+                receiverStr,
+                BigInt(Math.floor(Number(amount) * 1e6)),
+                undefined, // closeRemainderTo
+                note ? new TextEncoder().encode(note) : undefined,
+                sp
+            );
 
             setStatus('Signing with KMD...');
             const signResult = await kmd.signTransaction(handle, '', txn);
