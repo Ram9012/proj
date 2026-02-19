@@ -12,6 +12,8 @@ export default function NavBar() {
         { to: '/institute', label: '🏫 Institute' },
         { to: '/student', label: '🎓 Student' },
         { to: '/recruiter', label: '🔍 Recruiter' },
+        { to: '/app-lab', label: '🧪 App Lab' },
+        { to: '/funding', label: '💰 Funding' },
     ];
 
     return (

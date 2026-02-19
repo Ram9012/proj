@@ -7,6 +7,8 @@ import HomePage from './pages/HomePage';
 import InstitutePage from './pages/InstitutePage';
 import StudentPage from './pages/StudentPage';
 import RecruiterPage from './pages/RecruiterPage';
+import AppLabPage from './pages/AppLabPage';
+import FundingPage from './pages/FundingPage';
 
 export default function App() {
   return (
@@ -37,6 +39,8 @@ export default function App() {
             <Route path="/institute" element={<InstitutePage />} />
             <Route path="/student" element={<StudentPage />} />
             <Route path="/recruiter" element={<RecruiterPage />} />
+            <Route path="/app-lab" element={<AppLabPage />} />
+            <Route path="/funding" element={<FundingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>
