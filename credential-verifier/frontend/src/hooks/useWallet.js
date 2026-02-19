@@ -1,73 +1,70 @@
-import { useState, useEffect, useCallback } from 'react';
-import { PeraWalletConnect } from '@perawallet/connect';
 
-const peraWallet = new PeraWalletConnect({ shouldShowSignTxnToast: true });
+import { useState, useEffect, useCallback } from 'react';
+import algosdk from 'algosdk';
+
+const DEFAULT_MNEMONIC = "wave fold crime bubble curious vanish office cushion melody bless unusual option feature afford must renew grief day harbor rose pyramid adult drink above nose";
 
 export function useWallet() {
-    const [accounts, setAccounts] = useState([]);
+    const [activeAccount, setActiveAccount] = useState(null);
+    const [privateKey, setPrivateKey] = useState(null);
     const [isConnecting, setIsConnecting] = useState(false);
 
     useEffect(() => {
-        // Reconnect existing session on mount
-        peraWallet
-            .reconnectSession()
-            .then((addr) => {
-                if (addr && addr.length) setAccounts(addr);
-                peraWallet.connector?.on('disconnect', handleDisconnect);
-            })
-            .catch(() => { });
-    }, []);
-
-    function handleDisconnect() {
-        setAccounts([]);
-    }
-
-    const connect = useCallback(async () => {
-        setIsConnecting(true);
-        try {
-            const newAccounts = await peraWallet.connect();
-            peraWallet.connector?.on('disconnect', handleDisconnect);
-            setAccounts(newAccounts);
-            return newAccounts;
-        } catch (e) {
-            if (e?.data?.type !== 'CONNECT_MODAL_CLOSED') {
-                console.error('Wallet connect error:', e);
+        // Recover from local storage
+        const stored = localStorage.getItem('local_wallet_mnemonic');
+        if (stored) {
+            try {
+                const account = algosdk.mnemonicToSecretKey(stored);
+                setActiveAccount(account.addr);
+                setPrivateKey(account);
+            } catch (e) {
+                console.error("Invalid stored mnemonic", e);
+                localStorage.removeItem('local_wallet_mnemonic');
             }
-            return [];
-        } finally {
-            setIsConnecting(false);
         }
     }, []);
 
-    const disconnect = useCallback(() => {
-        peraWallet.disconnect();
-        setAccounts([]);
+    const connect = useCallback(async () => {
+        setIsConnecting(true);
+        // Small delay to let UI show loading state
+        await new Promise(r => setTimeout(r, 100));
+
+        const mnemonic = window.prompt("Enter your 25-word mnemonic:", DEFAULT_MNEMONIC);
+
+        if (mnemonic) {
+            try {
+                const account = algosdk.mnemonicToSecretKey(mnemonic.trim());
+                setActiveAccount(account.addr);
+                setPrivateKey(account);
+                localStorage.setItem('local_wallet_mnemonic', mnemonic.trim());
+            } catch (e) {
+                alert("Invalid mnemonic: " + e.message);
+            }
+        }
+        setIsConnecting(false);
     }, []);
 
-    /**
-     * Returns a Pera-compatible transaction signer function.
-     */
+    const disconnect = useCallback(() => {
+        setActiveAccount(null);
+        setPrivateKey(null);
+        localStorage.removeItem('local_wallet_mnemonic');
+    }, []);
+
     const signer = useCallback(
-        async (txnGroup, indexesToSign) => {
-            const txnsToSign = txnGroup.map((txn, idx) => {
-                if (indexesToSign.includes(idx)) {
-                    return { txn, signers: [accounts[0]] };
-                }
-                return { txn, signers: [] };
-            });
-            const signed = await peraWallet.signTransaction([txnsToSign]);
-            return signed;
+        (txnGroup, indexesToSign) => {
+            if (!privateKey) throw new Error("Wallet not connected");
+            const s = algosdk.makeBasicAccountTransactionSigner(privateKey);
+            return s(txnGroup, indexesToSign);
         },
-        [accounts]
+        [privateKey]
     );
 
     return {
-        accounts,
-        activeAccount: accounts[0] || null,
+        activeAccount,
         isConnecting,
         connect,
         disconnect,
         signer,
-        isConnected: accounts.length > 0,
+        isConnected: !!activeAccount,
     };
 }

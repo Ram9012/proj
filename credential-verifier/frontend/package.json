@@ -12,6 +12,8 @@
   "dependencies": {
     "@perawallet/connect": "^1.5.0",
     "algosdk": "^3.5.2",
+    "buffer": "^6.0.3",
+    "process": "^0.11.10",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hot-toast": "^2.6.0",
