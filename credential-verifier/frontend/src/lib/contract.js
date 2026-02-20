@@ -169,13 +169,11 @@ export async function optInToAsset(sender, signer, assetId) {
     const cleanSender = senderStr.trim();
 
     const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-        from: cleanSender,
-        to: cleanSender,
+        sender: cleanSender,
+        receiver: cleanSender,
         assetIndex: Number(assetId),
         amount: 0,
         suggestedParams: params,
-        closeRemainderTo: undefined,
-        revocationTarget: undefined
     });
 
     // Debug logging
@@ -183,7 +181,7 @@ export async function optInToAsset(sender, signer, assetId) {
     console.log(`DEBUG: Type=${typeof cleanSender} Len=${cleanSender.length}`);
 
 
-    const signedTxns = await signer([{ txn, signers: [senderStr] }], [0]);
+    const signedTxns = await signer([txn], [0]);
     const { txId } = await algodClient.sendRawTransaction(signedTxns).do();
     await algosdk.waitForConfirmation(algodClient, txId, 4);
     return { txId };

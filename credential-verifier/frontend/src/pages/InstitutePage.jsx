@@ -51,9 +51,33 @@ export default function InstitutePage() {
     );
 }
 
+const KNOWN_STUDENTS = [
+    { name: 'Test Student 1', address: 'ZELYFDGVLGDIQNUPJFGV5RDNNFINJ7CKKACBBIM4ANRLGDPXBXOA3E65XY' },
+    { name: 'Test Student 2', address: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' }, // Placeholder
+];
+
+function QuickFill({ onSelect }) {
+    return (
+        <div style={{ marginBottom: 10 }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginRight: 8 }}>Quick Fill:</span>
+            <select
+                className="form-input"
+                style={{ display: 'inline-block', width: 'auto', padding: '4px 8px', fontSize: '0.85rem' }}
+                onChange={(e) => e.target.value && onSelect(e.target.value)}
+                defaultValue=""
+            >
+                <option value="" disabled>Select a student...</option>
+                {KNOWN_STUDENTS.map(s => (
+                    <option key={s.address} value={s.address}>{s.name}</option>
+                ))}
+            </select>
+        </div>
+    );
+}
+
 /* ─── Issue Credential Form ─── */
 function IssueForm({ isConnected, sender, signer }) {
-    const [form, setForm] = useState({ studentAddress: '', assetName: '', unitName: '', ipfsUrl: '', customFee: '' });
+    const [form, setForm] = useState({ studentAddress: '', assetName: 'Certified Developer', unitName: 'DEV', ipfsUrl: '', customFee: '' });
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [result, setResult] = useState(null);
@@ -110,6 +134,7 @@ function IssueForm({ isConnected, sender, signer }) {
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
                     <label className="form-label" htmlFor="issue-student-address">Student Algorand Address *</label>
+                    <QuickFill onSelect={(addr) => setForm(f => ({ ...f, studentAddress: addr }))} />
                     <input
                         id="issue-student-address"
                         className="form-input"
@@ -293,6 +318,7 @@ function TransferForm({ isConnected, sender, signer }) {
                 </div>
                 <div className="form-group">
                     <label className="form-label" htmlFor="transfer-student-address">Student Algorand Address *</label>
+                    <QuickFill onSelect={(addr) => setForm(f => ({ ...f, studentAddress: addr }))} />
                     <input
                         id="transfer-student-address"
                         className="form-input"
@@ -394,6 +420,7 @@ function RevokeForm({ isConnected, sender, signer }) {
                 </div>
                 <div className="form-group">
                     <label className="form-label" htmlFor="revoke-student-address">Student Algorand Address *</label>
+                    <QuickFill onSelect={(addr) => setForm(f => ({ ...f, studentAddress: addr }))} />
                     <input
                         id="revoke-student-address"
                         className="form-input"

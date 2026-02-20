@@ -15,7 +15,6 @@ export default function StudentPage() {
     const [assets, setAssets] = useState([]);
     const [loading, setLoading] = useState(false);
     const [optInAssetId, setOptInAssetId] = useState('');
-    const [optInFee, setOptInFee] = useState('');
     const [optInLoading, setOptInLoading] = useState(false);
 
     // QR Code State
@@ -77,10 +76,9 @@ export default function StudentPage() {
         if (!optInAssetId) return toast.error('Enter an Asset ID to opt in.');
         setOptInLoading(true);
         try {
-            const { txId } = await optInToAsset(activeAccount, signer, optInAssetId, optInFee);
+            const { txId } = await optInToAsset(activeAccount, signer, optInAssetId);
             toast.success(`Opted in to ASA ${optInAssetId}!`);
             setOptInAssetId('');
-            setOptInFee('');
         } catch (err) {
             toast.error(err?.message || 'Opt-in failed.');
             console.error(err);
@@ -230,16 +228,6 @@ export default function StudentPage() {
                         disabled={!isConnected || optInLoading}
                         style={{ flex: 1, minWidth: 200 }}
                         id="opt-in-asset-id"
-                    />
-                    <input
-                        className="form-input"
-                        type="number"
-                        placeholder="Fee (µAlgo)"
-                        value={optInFee}
-                        onChange={(e) => setOptInFee(e.target.value)}
-                        disabled={!isConnected || optInLoading}
-                        style={{ width: 120 }}
-                        title="Transaction Fee"
                     />
                     <button
                         type="submit"
