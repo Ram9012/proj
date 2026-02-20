@@ -152,16 +152,35 @@ export async function getIssuerInfo() {
 }
 
 export async function optInToAsset(sender, signer, assetId) {
+    console.log(`DEBUG: optInToAsset sender=${sender} assetId=${assetId}`);
     const sp = await algodClient.getTransactionParams().do();
     const senderStr = str(sender);
+    console.log(`DEBUG: senderStr=${senderStr}`);
+
+    // Normalize params (SDK v2 vs v3 differences)
+    const params = {
+        ...sp,
+        firstRound: sp.firstValid ?? sp.firstRound,
+        lastRound: sp.lastValid ?? sp.lastRound,
+    };
+
+    // Trim address to be safe
+    const cleanSender = senderStr.trim();
 
     const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-        from: senderStr,
-        to: senderStr,
+        from: cleanSender,
+        to: cleanSender,
         assetIndex: Number(assetId),
         amount: 0,
-        suggestedParams: sp,
+        suggestedParams: params,
+        closeRemainderTo: undefined,
+        revocationTarget: undefined
     });
+
+    // Debug logging
+    console.log(`DEBUG: cleanSender=${cleanSender}`);
+    console.log(`DEBUG: Type=${typeof cleanSender} Len=${cleanSender.length}`);
+
 
     const signedTxns = await signer([{ txn, signers: [senderStr] }], [0]);
     const { txId } = await algodClient.sendRawTransaction(signedTxns).do();

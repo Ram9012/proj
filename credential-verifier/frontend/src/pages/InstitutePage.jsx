@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useWalletContext } from '../context/WalletContext';
 import { issueCredential, transferToStudent, revokeCredential } from '../lib/contract';
 import { getExplorerUrl, APP_ID } from '../lib/algorand';
+import { uploadFileToPinata } from '../lib/pinata';
 import toast from 'react-hot-toast';
 
 const TABS = ['Issue Credential', 'Transfer to Student', 'Revoke Credential'];
@@ -54,10 +55,30 @@ export default function InstitutePage() {
 function IssueForm({ isConnected, sender, signer }) {
     const [form, setForm] = useState({ studentAddress: '', assetName: '', unitName: '', ipfsUrl: '', customFee: '' });
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [result, setResult] = useState(null);
 
     function handleChange(e) {
         setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+    }
+
+    async function handleFileChange(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploading(true);
+        const toastId = toast.loading('Uploading to Pinata IPFS...');
+
+        try {
+            const cid = await uploadFileToPinata(file);
+            setForm((f) => ({ ...f, ipfsUrl: `ipfs://${cid}` }));
+            toast.success('File uploaded! CID retrieved.', { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error('Upload failed: ' + error.message, { id: toastId });
+        } finally {
+            setUploading(false);
+        }
     }
 
     async function handleSubmit(e) {
@@ -96,7 +117,7 @@ function IssueForm({ isConnected, sender, signer }) {
                         placeholder="ABCDEF1234…"
                         value={form.studentAddress}
                         onChange={handleChange}
-                        disabled={!isConnected || loading}
+                        disabled={loading}
                     />
                 </div>
                 <div className="form-group">
@@ -108,7 +129,7 @@ function IssueForm({ isConnected, sender, signer }) {
                         placeholder="Bachelor of Computer Science"
                         value={form.assetName}
                         onChange={handleChange}
-                        disabled={!isConnected || loading}
+                        disabled={loading}
                     />
                 </div>
                 <div className="form-group">
@@ -121,21 +142,47 @@ function IssueForm({ isConnected, sender, signer }) {
                         maxLength={8}
                         value={form.unitName}
                         onChange={handleChange}
-                        disabled={!isConnected || loading}
+                        disabled={loading}
                     />
                     <span className="form-hint">Short identifier (max 8 chars)</span>
                 </div>
                 <div className="form-group">
-                    <label className="form-label" htmlFor="issue-ipfs-url">IPFS URL (Certificate PDF/Metadata)</label>
+                    <label className="form-label">Upload Certificate (Optional)</label>
                     <input
-                        id="issue-ipfs-url"
+                        type="file"
                         className="form-input"
-                        name="ipfsUrl"
-                        placeholder="ipfs://Qm…"
-                        value={form.ipfsUrl}
-                        onChange={handleChange}
-                        disabled={!isConnected || loading}
+                        onChange={handleFileChange}
+                        disabled={loading || uploading}
                     />
+                    <span className="form-hint">Automatically uploads to Pinata IPFS and sets URL below.</span>
+                </div>
+
+                <div className="form-group">
+                    <label className="form-label" htmlFor="issue-ipfs-url">IPFS URL (Certificate PDF/Metadata)</label>
+                    <div style={{ position: 'relative' }}>
+                        <input
+                            id="issue-ipfs-url"
+                            className="form-input"
+                            name="ipfsUrl"
+                            placeholder="ipfs://Qm…"
+                            value={form.ipfsUrl}
+                            onChange={handleChange}
+                            disabled={loading || uploading}
+                            style={{ paddingRight: uploading ? '40px' : '12px' }}
+                        />
+                        {uploading && (
+                            <div style={{
+                                position: 'absolute',
+                                right: '12px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}>
+                                <span className="spinner" style={{ width: '16px', height: '16px' }} />
+                            </div>
+                        )}
+                    </div>
                     <span className="form-hint">Link to off-chain certificate document</span>
                 </div>
                 <div className="form-group">
@@ -148,14 +195,14 @@ function IssueForm({ isConnected, sender, signer }) {
                         placeholder="Default (2000)"
                         value={form.customFee}
                         onChange={handleChange}
-                        disabled={!isConnected || loading}
+                        disabled={loading}
                     />
                     <span className="form-hint">Optional: Override default fee (min 2000 for this op)</span>
                 </div>
                 <button
                     type="submit"
                     className="btn btn-primary btn-full"
-                    disabled={!isConnected || loading}
+                    disabled={loading || uploading}
                     id="btn-issue-credential"
                 >
                     {loading ? <><span className="spinner" /> Issuing…</> : '🎫 Issue Credential'}
