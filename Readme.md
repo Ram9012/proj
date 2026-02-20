@@ -30,7 +30,6 @@ https://www.linkedin.com/posts/vishnu-v-53488b28a_rift-pwioi-ugcPost-74304274734
 Netlify : https://credverify.netlify.app/
 
  **App ID (Testnet)**: `755802996`
- **Testnet Explorer Link**: [Application 1001 on AlgoExplorer](https://testnet.algoexplorer.io/application/755802996)
 
 # Architecture Overview 
 
